@@ -89,7 +89,7 @@ def recortar_ultimos_x_segundos_from_buffer(frame_buffer, output_file, recortar_
 
     print("Vídeo recortado com sucesso")
 
-def buildCutName():
+def buildCutName(cameraName):
     timestamp_atual = datetime.now().strftime("%d-%m-%Y_%H%M%S")
-    name = "cut" + timestamp_atual + ".mp4"
+    name = "cut-camera" + str(cameraName) + "-" + timestamp_atual + ".mp4"
     return name
