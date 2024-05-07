@@ -6,49 +6,58 @@ duracao_video_principal = 60
 recortar_ultimos_x_segundos = 5
 
 api_bp = Flask(__name__)
-gravacao_thread = None  # Variável para armazenar a thread de gravação atual
-lastFullRecordName = ""
+
+# Estrutura do objeto recordGroup
+recordGroup = {
+    "name": "Via A",
+    "cameraGroup": [
+        {
+            "camera": 0,
+            "gravacao_thread": None,
+            "lastFullName": ""
+        },
+        {
+            "camera": 1,
+            "gravacao_thread": None,
+            "lastFullName": ""
+        }
+    ]
+}
 
 @api_bp.route('/ping', methods=['GET'])
 def ping():
-    # Coloque aqui a lógica para iniciar o processo de gravação de vídeo
     return jsonify({'message': 'pong'})
 
 @api_bp.route('/gravar', methods=['POST'])
 def gravar_video():
-    global gravacao_thread
-    global lastFullRecordName
+    global recordGroup
 
-    if gravacao_thread and gravacao_thread.is_alive():
-        return jsonify({'error': 'Uma gravação já está em andamento'}), 400
+    for camera in recordGroup['cameraGroup']:
+        if camera['gravacao_thread'] and camera['gravacao_thread'].is_alive():
+            return jsonify({'error': f'Uma gravação já está em andamento para a câmera {camera["camera"]}'}), 400
+        
+        camera['lastFullName'] = record.buildFullRecordName(camera['camera'])
+        camera['gravacao_thread'] = Thread(target=record.gravar_video_principal, args=(camera['camera'], camera['lastFullName'], duracao_video_principal))
+        camera['gravacao_thread'].start()
     
-    lastFullRecordName = record.buildFullRecordName()
-    print(lastFullRecordName)
-
-    gravacao_thread = Thread(target=record.gravar_video_principal, args=(lastFullRecordName, duracao_video_principal))
-    gravacao_thread.start()
-    
-    return jsonify({'message': 'Iniciando gravação de vídeo...'})
+    return jsonify({'message': 'Iniciando gravação de vídeo para todas as câmeras...'})
 
 @api_bp.route('/recortar', methods=['POST'])
 def recortar_video():
-    global gravacao_thread
-    global lastFullRecordName
-    if gravacao_thread and gravacao_thread.is_alive():
-        record.parar_gravacao()
-        gravacao_thread.join()
+    global recordGroup
 
-    cutName = cut.buildCutName()
-    recorte_thread = Thread(target=cut.recortar_ultimos_x_segundos, args=(lastFullRecordName, cutName, recortar_ultimos_x_segundos))
-    recorte_thread.start()
-    recorte_thread.join()
+    for camera in recordGroup['cameraGroup']:
+        if camera['gravacao_thread'] and camera['gravacao_thread'].is_alive():
+            record.parar_gravacao()
+            camera['gravacao_thread'].join()
+
+        cutName = cut.buildCutName(camera['camera'])
+        recorte_thread = Thread(target=cut.recortar_ultimos_x_segundos, args=(camera['lastFullName'], cutName, recortar_ultimos_x_segundos))
+        recorte_thread.start()
+        recorte_thread.join()
 
     gravar_video()
-    return jsonify({'message': 'Iniciando recorte de vídeo...'})
+    return jsonify({'message': 'Iniciando recorte de vídeo para todas as câmeras...'})
 
 if __name__ == '__main__':
     api_bp.run(debug=True)
-
-# Mudar a abordagem?
-# Ao socilicitar o recorte, parar a gravacao e iniciar a proxima,
-# liberando esse primeiro arquivo para recortar os ultimos x segundos

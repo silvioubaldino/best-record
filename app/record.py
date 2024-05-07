@@ -4,10 +4,10 @@ from datetime import datetime
 # Variável de controle para parar a gravação
 _gravacao_ativa = True
 
-def gravar_video_principal(video_filename, duracao_video_principal):
+def gravar_video_principal(camera, video_filename, duracao_video_principal):
     global _gravacao_ativa
     _gravacao_ativa = True
-    cap = cv2.VideoCapture(0)  # Abre a câmera padrão
+    cap = cv2.VideoCapture(camera)  # Abre a câmera padrão
 
     # Verifica se a captura foi iniciada corretamente
     if not cap.isOpened():
@@ -46,7 +46,7 @@ def parar_gravacao():
     global _gravacao_ativa
     _gravacao_ativa = False
 
-def buildFullRecordName():
+def buildFullRecordName(cameraName):
     timestamp_atual = datetime.now().strftime("%d-%m-%Y_%H%M%S")
-    name = "fullRecord" + timestamp_atual + ".avi"
+    name = "fullRecord-camera" + str(cameraName) + "-" + timestamp_atual + ".avi"
     return name
