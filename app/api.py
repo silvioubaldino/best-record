@@ -1,12 +1,17 @@
+import os.path
+import time
 from threading import Thread
 from flask import Flask, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 
 import cut
 import record
+import fileManager
 
 duracao_video_principal = 60
 recortar_ultimos_x_segundos = 5
+cutDirectory = "/Users/sineto/record/cuts/"
+allRecordDirectory = "/Users/sineto/record/allrecords/"
 
 api_bp = Flask(__name__)
 CORS(api_bp)
@@ -20,17 +25,14 @@ recordGroup = {
             "gravacao_thread": None,
             "lastFullName": ""
         },
-        {
-            "camera": 1,
-            "gravacao_thread": None,
-            "lastFullName": ""
-        }
     ]
 }
+
 
 @api_bp.route('/ping', methods=['GET'])
 def ping():
     return jsonify({'message': 'pong'})
+
 
 @api_bp.route('/rec/start', methods=['POST'])
 def start_record():
@@ -39,8 +41,8 @@ def start_record():
     for camera in recordGroup['cameraGroup']:
         if camera['gravacao_thread'] and camera['gravacao_thread'].is_alive():
             return jsonify({'error': f'Uma gravação já está em andamento para a câmera {camera["camera"]}'}), 400
-        
-        camera['lastFullName'] = record.buildFullRecordName(camera['camera'])
+
+        camera['lastFullName'] = record.buildFullRecordName(allRecordDirectory, camera['camera'])
         camera['gravacao_thread'] = Thread(target=record.gravar_video_principal,
                                            args=(camera['camera'], camera['lastFullName'], duracao_video_principal))
         camera['gravacao_thread'].start()
@@ -60,15 +62,13 @@ def recortar_video():
         cutName = cut.buildCutName(camera['camera'])
         cutNames.append(cutName)
         recorte_thread = Thread(target=cut.recortar_ultimos_x_segundos,
-                                args=(camera['lastFullName'], cutName, recortar_ultimos_x_segundos))
+                                    args=(camera['lastFullName'], cutDirectory + cutName, recortar_ultimos_x_segundos))
         recorte_thread.start()
         recorte_thread.join()
 
     start_record()
+    return send_from_directory(cutDirectory, cutNames[0])
 
-    video_path = '../'
-    print(cutNames[0])
-    return send_from_directory(video_path, cutNames[0])
 
 @api_bp.route('/rec/stop', methods=['POST'])
 def parar_gravacao():
@@ -90,9 +90,10 @@ def has_recording():
             'message': 'no group recording',
             "isRecording": False})
 
-@api_bp.route('/home')
-def home():
-    return render_template('html.html')
+@api_bp.route('/clean', methods=['POST'])
+def clean():
+    fileManager.clean_old_records(allRecordDirectory)
+    return jsonify({'message': 'cleaned'})
 
 
 if __name__ == '__main__':
